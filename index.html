@@ -33,6 +33,7 @@
   --turn-soft:#EFE3FF;
   --radius:20px;
   --shadow:0 10px 24px rgba(90,50,130,.16);
+  --shadow-card:0 4px 10px rgba(90,50,130,.18);
   --dur:.42s;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -132,11 +133,12 @@ h1,h2,h3,.display{font-family:'Jua','Apple SD Gothic Neo',sans-serif;font-weight
   width:min(100%, calc(var(--availh, 60vh) * 3 * var(--cols) / 4 / var(--rows)));
   max-height:var(--availh, 60vh);
 }
-.card{position:relative;aspect-ratio:3/4;perspective:900px;background:none;padding:0}
+.card{position:relative;aspect-ratio:3/4;perspective:900px;background:none;padding:0;contain:layout paint style}
 .card .inner{
   position:absolute;inset:0;transform-style:preserve-3d;
   transition:transform var(--dur) cubic-bezier(.3,1.4,.5,1);
 }
+.card.flipping .inner{will-change:transform}
 .card.flipped .inner{transform:rotateY(180deg)}
 /* .face 는 3D 회전 + 뒷면 숨기기만 담당해요.
    (사파리/아이패드는 backface-visibility:hidden 이 border-radius+overflow:hidden 과
@@ -146,7 +148,7 @@ h1,h2,h3,.display{font-family:'Jua','Apple SD Gothic Neo',sans-serif;font-weight
   position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
 }
 .face .clip{
-  position:absolute;inset:0;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);
+  position:absolute;inset:0;border-radius:14px;overflow:hidden;box-shadow:var(--shadow-card);
 }
 .back .clip{
   background:linear-gradient(140deg,var(--turn-c),var(--turn-c2));
@@ -154,8 +156,8 @@ h1,h2,h3,.display{font-family:'Jua','Apple SD Gothic Neo',sans-serif;font-weight
 }
 .back .clip::after{
   content:"";position:absolute;inset:0;opacity:.35;
-  background-image:radial-gradient(circle at 50% 50%, #fff 1.4px, transparent 1.6px);
-  background-size:14px 14px;
+  background-image:radial-gradient(circle at 50% 50%, #fff 1.6px, transparent 1.8px);
+  background-size:22px 22px;
 }
 .back .mark{width:38%;color:#fff;opacity:.95;z-index:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.15))}
 .front{
@@ -355,18 +357,18 @@ const DECK = [
   /* 여기부터 새로 추가한 12마리예요.
      이름 옆에 (확인필요)라고 적힌 3개는 정확한 이름을 못 찾아서 임시로 붙인 이름이에요.
      정확한 이름을 알려주시면 여기 name 값만 바꾸면 바로 반영돼요. */
-  {name:'꾸래핑',      color:'#4E8FE0', img:'img/13.jpg'},
+  {name:'사뿐핑',      color:'#4E8FE0', img:'img/13.jpg'},
   {name:'꾸며핑',      color:'#4CC26B', img:'img/14.jpg'},
-  {name:'삐짐핑',      color:'#D24FC2', img:'img/15.jpg'},
-  {name:'사뿐핑', color:'#F2A9D8', img:'img/16.jpg'},
+  {name:'롤리핑',      color:'#D24FC2', img:'img/15.jpg'},
+  {name:'사뿐핑(공주)', color:'#F2A9D8', img:'img/16.jpg'},
   {name:'샤를핑',      color:'#2C4FBE', img:'img/17.jpg'},
-  {name:'솔찌핑', color:'#F5C451', img:'img/18.jpg'},
-  {name:'아라핑', color:'#7C5CC4', img:'img/19.jpg'},
-  {name:'아름핑', color:'#FF8FC7', img:'img/20.jpg'},
+  {name:'안경핑(확인필요)', color:'#F5C451', img:'img/18.jpg'},
+  {name:'마법사핑(확인필요)', color:'#7C5CC4', img:'img/19.jpg'},
+  {name:'롤러핑(확인필요)', color:'#FF8FC7', img:'img/20.jpg'},
   {name:'트롯핑',      color:'#E0384F', img:'img/21.jpg'},
   {name:'파티핑',      color:'#C23FD6', img:'img/22.jpg'},
   {name:'패션핑',      color:'#E85A2B', img:'img/23.jpg'},
-  {name:'퐁당핑',      color:'#F06FA0', img:'img/24.jpg'},
+  {name:'소라핑',      color:'#F06FA0', img:'img/24.jpg'},
 ];
 
 const ART = {
@@ -504,13 +506,14 @@ function start(){
   const [c,r] = GRID[S.pairs*2];
   applyGrid(c, r);
   board.innerHTML = '';
+  const frag = document.createDocumentFragment();
   cards.forEach((m,i)=>{
     const el = document.createElement('button');
     el.className = 'card';
     el.style.setProperty('--mc', m.color);
     el.dataset.name = m.name;
     const art = m.img
-      ? `<img src="${m.img}" alt="${m.name}" onerror="this.replaceWith(makeArt('${m.fb}'))">`
+      ? `<img src="${m.img}" alt="${m.name}" decoding="async" onerror="this.replaceWith(makeArt('${m.fb}'))">`
       : `<div class="art">${svg(m.name)}</div>`;
     el.innerHTML = `<div class="inner">
         <div class="face back"><div class="clip"><div class="mark">${MARK}</div></div></div>
@@ -518,8 +521,9 @@ function start(){
       </div>`;
     el.addEventListener('click', ()=>flip(el, m));
     el.style.animation = `deal .4s ${i*26}ms both`;
-    board.appendChild(el);
+    frag.appendChild(el);
   });
+  board.appendChild(frag);
 
   setTurn(0);
   requestAnimationFrame(fit);
@@ -665,7 +669,9 @@ $('#btnResRank').onclick = () => { openRank(S.pairs); };
 /* ── 뒤집기 ───────────────────────────── */
 function flip(el, m){
   if(S.lock || el.classList.contains('flipped') || el.classList.contains('gone')) return;
-  el.classList.add('flipped'); sFlip();
+  el.classList.add('flipped', 'flipping'); sFlip();
+  const inner = el.querySelector('.inner');
+  inner.addEventListener('transitionend', ()=>el.classList.remove('flipping'), {once:true});
 
   if(!S.first){ S.first = {el, m}; return; }
 
